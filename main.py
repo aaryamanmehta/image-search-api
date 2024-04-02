@@ -5,16 +5,19 @@ from sentence_transformers import SentenceTransformer, util
 import vecs
 import numpy as np
 import argparse
-from flask import Flask, request
 from datetime import date
-
-app = Flask(__name__)
+from flask import Flask, request, jsonify
 
 DB_CONNECTION = "postgresql://postgres.flapymzejiswrwxiluxf:m49WVIWLTgPc5pqU@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
 
-def seed(model_name, dimension):
-    zip_file = request.files['zip_file']
-    collection_name = request.form['collection_name']
+app = Flask(__name__)
+
+@app.route('/seed', methods=['POST'])
+def seed():
+    model_name = 'clip-ViT-B-32'
+    dimension = 512
+    collection_name = request.json.get('collection_name')
+    zip_file = request.json.get('zip_file')
 
     try:
         # create vector store client
@@ -65,11 +68,20 @@ def seed(model_name, dimension):
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
+        
+    return jsonify({'message': 'Images seeded successfully'})
 
-def search(model_name, dimension, query_string, similarity_threshold, limit):
-    zip_file = request.files['zip_file']
-    collection_name = request.form['collection_name']
 
+@app.route('/search', methods=['POST'])
+def search():
+    model_name = 'clip-ViT-B-32'
+    dimension = 512
+    query_string = request.json.get('query_string')
+    similarity_threshold = request.json.get('similarity_threshold')
+    limit = request.json.get('limit')
+    zip_file = request.json.get('zip_file')
+    collection_name = request.json.get('collection_name')
+    final_return = []
     try:
         # create vector store client
         vx = vecs.create_client(DB_CONNECTION)
@@ -112,6 +124,8 @@ def search(model_name, dimension, query_string, similarity_threshold, limit):
                         print("Similarity:", similarity)
                         if similarity > similarity_threshold:
                             displayed_images.append(result)  # Add displayed images
+                            
+        final_return.append(displayed_images)
 
         if not results:
             print("No images found matching the query.")
@@ -120,12 +134,19 @@ def search(model_name, dimension, query_string, similarity_threshold, limit):
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
-        return []
+    
+    return jsonify({'message': 'Images searched successfully', 'images': final_return})
 
-def auto_search(model_name, dimension, query_string):
-    zip_file = request.files['zip_file']
-    collection_name = request.form['collection_name']
 
+
+@app.route('/auto_search', methods=['POST'])
+def auto_search():
+    model_name = 'clip-ViT-B-32'
+    dimension = 512
+    query_string = request.json.get('query_string')
+    zip_file = request.json.get('zip_file')
+    collection_name = request.json.get('collection_name')
+    final_return = []
     try:
         # create vector store client
         vx = vecs.create_client(DB_CONNECTION)
@@ -164,6 +185,7 @@ def auto_search(model_name, dimension, query_string):
                         similarity = np.dot(text_emb, img_emb) / (np.linalg.norm(text_emb) * np.linalg.norm(img_emb))
                         displayed_images.append(result)  # Add displayed images
 
+        final_return.append(displayed_images)
         if not results:
             print("No images found matching the query.")
 
@@ -171,12 +193,19 @@ def auto_search(model_name, dimension, query_string):
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
-        return []
+    
+    return jsonify({'message': 'Images searched successfully', 'images': final_return})
 
-def cluster_search(model_name, dimension, cluster_similarity_threshold, min_community_size, max_community_size):
-    zip_file = request.files['zip_file']
-    collection_name = request.form['collection_name']
-
+@app.route('/cluster_search', methods=['POST'])
+def cluster_search():
+    model_name = 'clip-ViT-B-32'
+    dimension = 512
+    cluster_similarity_threshold = 0.8
+    min_community_size = 2
+    max_community_size = 10
+    zip_file = request.json.get('zip_file')
+    collection_name = request.json.get('collection_name')
+    final_return = []
     try:
         # create vector store client
         vx = vecs.create_client(DB_CONNECTION)
@@ -247,22 +276,12 @@ def cluster_search(model_name, dimension, cluster_similarity_threshold, min_comm
         if not clusters:
             print("No clusters found.")
         print(cluster_data)
+        final_return.append(cluster_data)
         return cluster_data
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
-        return []
-        
-@app.route('/search', methods=['POST'])
-def handle_search():
-    zip_file = request.files['zip_file']
-    collection_name = request.form['collection_name']
-    
-    # Call your existing functions with the provided zip_file and collection_name
-    # For example, to perform a cluster search:
-    cluster_data = cluster_search("clip-ViT-B-32", 512, 0.9, 2, 10, zip_file, collection_name)
-
-    return {'cluster_data': cluster_data}
+    return jsonify({'message': 'Images clustered successfully', 'images': final_return})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
