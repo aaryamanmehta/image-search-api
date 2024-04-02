@@ -5,11 +5,17 @@ from sentence_transformers import SentenceTransformer, util
 import vecs
 import numpy as np
 import argparse
+from flask import Flask, request
 from datetime import date
+
+app = Flask(__name__)
 
 DB_CONNECTION = "postgresql://postgres.flapymzejiswrwxiluxf:m49WVIWLTgPc5pqU@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
 
-def seed(model_name, dimension, zip_file, collection_name):
+def seed(model_name, dimension):
+    zip_file = request.files['zip_file']
+    collection_name = request.form['collection_name']
+
     try:
         # create vector store client
         vx = vecs.create_client(DB_CONNECTION)
@@ -60,8 +66,10 @@ def seed(model_name, dimension, zip_file, collection_name):
     except Exception as e:
         print(f"An error occurred: {str(e)}")
 
+def search(model_name, dimension, query_string, similarity_threshold, limit):
+    zip_file = request.files['zip_file']
+    collection_name = request.form['collection_name']
 
-def search(model_name, dimension, query_string, similarity_threshold, limit, zip_file, collection_name):
     try:
         # create vector store client
         vx = vecs.create_client(DB_CONNECTION)
@@ -114,7 +122,10 @@ def search(model_name, dimension, query_string, similarity_threshold, limit, zip
         print(f"An error occurred: {str(e)}")
         return []
 
-def auto_search(model_name, dimension, query_string, zip_file, collection_name):
+def auto_search(model_name, dimension, query_string):
+    zip_file = request.files['zip_file']
+    collection_name = request.form['collection_name']
+
     try:
         # create vector store client
         vx = vecs.create_client(DB_CONNECTION)
@@ -162,7 +173,10 @@ def auto_search(model_name, dimension, query_string, zip_file, collection_name):
         print(f"An error occurred: {str(e)}")
         return []
 
-def cluster_search(model_name, dimension, cluster_similarity_threshold, min_community_size, max_community_size, zip_file, collection_name):
+def cluster_search(model_name, dimension, cluster_similarity_threshold, min_community_size, max_community_size):
+    zip_file = request.files['zip_file']
+    collection_name = request.form['collection_name']
+
     try:
         # create vector store client
         vx = vecs.create_client(DB_CONNECTION)
@@ -239,13 +253,16 @@ def cluster_search(model_name, dimension, cluster_similarity_threshold, min_comm
         print(f"An error occurred: {str(e)}")
         return []
         
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Image Search")
-    parser.add_argument("--zip_file", type=argparse.FileType('rb'), required=True, help="Path to the zip file containing image folders")
-    parser.add_argument("--collection_name", type=str, required=True, help="Name of the collection")
-    args = parser.parse_args()
+@app.route('/search', methods=['POST'])
+def handle_search():
+    zip_file = request.files['zip_file']
+    collection_name = request.form['collection_name']
+    
+    # Call your existing functions with the provided zip_file and collection_name
+    # For example, to perform a cluster search:
+    cluster_data = cluster_search("clip-ViT-B-32", 512, 0.9, 2, 10, zip_file, collection_name)
 
-    # Call the seed function with the provided image folder
-    seed("clip-ViT-B-32", 512, args.zip_file, args.collection_name)
-    cluster_search("clip-ViT-B-32", 512, 0.9, 2, 10, args.zip_file, args.collection_name)
+    return {'cluster_data': cluster_data}
 
+if __name__ == '__main__':
+    app.run(host='0.0.0.0')

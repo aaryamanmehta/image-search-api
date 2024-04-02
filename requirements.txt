@@ -4,3 +4,4 @@ vecs
 numpy
 argparse
 psycopg2-binary
+flask
